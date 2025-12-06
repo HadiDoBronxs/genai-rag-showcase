@@ -5,7 +5,7 @@ from langchain_text_splitters import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
-from langchain.chains.question_answering import load_qa_chain
+from langchain.chains import load_qa_chain
 
 def main():
     st.set_page_config(page_title="Chat with Hadi's Docs 📂", page_icon="🤖")
