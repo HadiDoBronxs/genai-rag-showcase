@@ -1,8 +1,9 @@
-streamlit
 langchain
 langchain-community
-langchain-openai
+langchain-core
 langchain-text-splitters
+langchain-openai
+streamlit
 openai
 faiss-cpu
 pypdf
