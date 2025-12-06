@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+.DS_Store
+.env
+# WICHTIG: Ignoriere den Daten-Ordner mit deinen privaten PDFs
+data/
