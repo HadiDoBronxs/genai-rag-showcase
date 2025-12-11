@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from pypdf import PdfReader
-from langchain_text_splitters import CharacterTextSplitter
+
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 from langchain_openai import ChatOpenAI
@@ -50,9 +50,8 @@ def main():
 
     # --- 3. DOKUMENTE LADEN (Ordner 'data') ---
     if st.session_state.knowledge_base is None:
-        text = ""
+        documents = []
         data_folder = "data" # Der Ordner neben der app.py
-        loaded_files = []
         
         # Prüfen, ob der Ordner existiert und Dateien enthält
         if os.path.exists(data_folder):
@@ -66,29 +65,39 @@ def main():
                         
                         try:
                             pdf_reader = PdfReader(pdf_path)
-                            for page in pdf_reader.pages:
+                            for i, page in enumerate(pdf_reader.pages):
                                 page_text = page.extract_text()
                                 if page_text:
-                                    text += page_text
-                            loaded_files.append(file)
+                                    # Metadaten für Zitate (Dateiname + Seitenzahl)
+                                    # Verwende Document Objekt für LangChain
+                                    from langchain_core.documents import Document
+                                    doc = Document(
+                                        page_content=page_text,
+                                        metadata={"source": file, "page": i+1}
+                                    )
+                                    documents.append(doc)
                         except Exception as e:
                             st.error(f"Konnte {file} nicht lesen: {e}")
                             
-                    status.update(label=f"Fertig! {len(loaded_files)} Dokumente verarbeitet.", state="complete", expanded=False)
+                    status.update(label=f"Fertig! {len(files)} Dateien verarbeitet.", state="complete", expanded=False)
                 
-                # Wenn Text gefunden wurde -> Vektordatenbank bauen
-                if text:
-                    text_splitter = CharacterTextSplitter(
-                        separator="\n",
+                # Wenn Dokumente gefunden wurden -> Vektordatenbank bauen
+                if documents:
+                    # Upgrade: RecursiveCharacterTextSplitter für besseren Kontext
+                    from langchain_text_splitters import RecursiveCharacterTextSplitter
+                    
+                    text_splitter = RecursiveCharacterTextSplitter(
                         chunk_size=1000,
                         chunk_overlap=200,
-                        length_function=len
+                        length_function=len,
+                        separators=["\n\n", "\n", " ", ""]
                     )
-                    chunks = text_splitter.split_text(text)
+                    # split_documents behält Metadaten bei!
+                    chunks = text_splitter.split_documents(documents)
                     
                     # Embeddings erstellen
                     embeddings = OpenAIEmbeddings(openai_api_key=api_key)
-                    st.session_state.knowledge_base = FAISS.from_texts(chunks, embeddings)
+                    st.session_state.knowledge_base = FAISS.from_documents(chunks, embeddings)
                     st.toast("Wissensdatenbank ist bereit! 🧠")
             else:
                 st.warning(f"Der Ordner '{data_folder}' ist leer. Bitte lege PDFs hinein.")
@@ -97,14 +106,22 @@ def main():
             # Fallback: Manueller Upload Button
             pdf = st.file_uploader("Alternative: Lade hier eine PDF hoch", type="pdf")
             if pdf:
+                from langchain_core.documents import Document
                 pdf_reader = PdfReader(pdf)
-                for page in pdf_reader.pages:
-                    text += page.extract_text()
-                if text:
-                    text_splitter = CharacterTextSplitter(separator="\n", chunk_size=1000, chunk_overlap=200, length_function=len)
-                    chunks = text_splitter.split_text(text)
+                for i, page in enumerate(pdf_reader.pages):
+                    text = page.extract_text()
+                    if text:
+                        doc = Document(
+                            page_content=text,
+                            metadata={"source": pdf.name, "page": i+1}
+                        )
+                        documents.append(doc)
+                if documents:
+                    from langchain_text_splitters import RecursiveCharacterTextSplitter
+                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                    chunks = text_splitter.split_documents(documents)
                     embeddings = OpenAIEmbeddings(openai_api_key=api_key)
-                    st.session_state.knowledge_base = FAISS.from_texts(chunks, embeddings)
+                    st.session_state.knowledge_base = FAISS.from_documents(chunks, embeddings)
 
     # --- 4. CHAT INTERFACE ---
     # Alten Verlauf anzeigen
@@ -130,12 +147,24 @@ def main():
                     llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key)
                     chain = load_qa_chain(llm, chain_type="stuff")
                     
-                    # Optional: System-Prompting (KI Verhalten steuern)
-                    # response = chain.run(input_documents=docs, question=f"Du bist ein HR-Assistent. Beantworte basierend auf den Unterlagen: {prompt}")
-                    response = chain.run(input_documents=docs, question=prompt)
+                    # System Prompt aktivieren
+                    system_instruction = "Du bist ein professioneller Assistent für Bewerbungsunterlagen. Antworte basierend auf dem Kontext. Wenn du etwas nicht weißt, sage es."
+                    response = chain.run(input_documents=docs, question=f"{system_instruction}\nFrage: {prompt}")
                     
                     st.markdown(response)
                     
+                    # 3. Quellen anzeigen
+                    with st.expander("📚 Verwendete Quellen anzeigen"):
+                        seen_sources = set()
+                        for doc in docs:
+                            source_id = f"{doc.metadata.get('source', 'Unbekannt')} (Seite {doc.metadata.get('page', '?')})"
+                            if source_id not in seen_sources:
+                                st.write(f"- {source_id}")
+                                # Optional: Vorschau des Textes
+                                # st.caption(doc.page_content[:150] + "...")
+                                seen_sources.add(source_id)
+                    
+            # Antwort und Quellen in History speichern (vereinfacht speichern wir nur den Text)
             st.session_state.messages.append({"role": "assistant", "content": response})
 
 if __name__ == '__main__':
