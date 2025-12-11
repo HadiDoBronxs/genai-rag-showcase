@@ -20,6 +20,7 @@ Technisch demonstriert dieses Projekt, wie Unternehmen internes Wissen (z.B. Han
 * **Multi-Document Ingestion:** Automatisches Einlesen ganzer Dokumenten-Ordner.
 * **Semantic Search:** Finden von Inhalten anhand der *Bedeutung* (Vektorsuche via FAISS).
 * **Context Awareness:** Die KI nutzt nur die bereitgestellten Fakten für Antworten (Vermeidung von Halluzinationen).
+* **Transparent Sources:** Jede Antwort enthält präzise Quellenangaben (Dateiname & Seitenzahl), um Vertrauen zu schaffen.
 
 ### ⚙️ Technische Architektur
 Der Workflow folgt dem modernen RAG-Pattern:
