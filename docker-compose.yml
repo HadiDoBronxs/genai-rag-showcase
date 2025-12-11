@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  chatbot-app:
+    build: .
+    container_name: rag-portfolio-bot
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data  # Damit man PDFs austauschen kann, ohne neu zu bauen
+    restart: unless-stopped
