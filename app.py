@@ -178,9 +178,19 @@ def main():
         # KI Antwort generieren
         if st.session_state.knowledge_base:
             with st.chat_message("assistant"):
-                # Callback Handler für Streaming (Schreibmaschinen-Effekt)
-                from langchain_community.callbacks import StreamlitCallbackHandler
-                st_callback = StreamlitCallbackHandler(st.container())
+                # Custom Handler für Streaming (ohne "Complete" Expander)
+                from langchain.callbacks.base import BaseCallbackHandler
+                class StreamHandler(BaseCallbackHandler):
+                    def __init__(self, container):
+                        self.container = container
+                        self.text = ""
+                    def on_llm_new_token(self, token: str, **kwargs):
+                        self.text += token
+                        self.container.markdown(self.text)
+                
+                # Leeren Container für den Text erstellen
+                response_placeholder = st.empty()
+                st_callback = StreamHandler(response_placeholder)
                 
                 with st.spinner("Suche Antworten..."):
                     # 1. Relevante Textstellen finden
@@ -199,10 +209,6 @@ def main():
                         question=f"{system_instruction}\nFrage: {prompt}",
                         callbacks=[st_callback]
                     )
-                    
-                    # Falls der Callback das Markdown nicht final rendert (manchmal nötig):
-                    # st.markdown(response) -> Der Callback macht das meist schon, aber sicherheitshalber lassen wir es weg, um Doppelung zu vermeiden.
-                    # Wenn der Callback fertig ist, steht der Text da.
                     
                     # 3. Quellen anzeigen
                     with st.expander("📚 Verwendete Quellen anzeigen"):
