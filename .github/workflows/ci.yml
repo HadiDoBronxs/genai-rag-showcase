@@ -35,3 +35,7 @@ jobs:
     - name: Syntax Check (Compile)
       run: |
         python3 -m py_compile app.py
+
+    - name: Test Docker Build
+      run: |
+        docker build . --file Dockerfile --tag my-app-test:latest
