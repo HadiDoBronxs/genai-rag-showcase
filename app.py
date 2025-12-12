@@ -201,7 +201,7 @@ def main():
                     chain = load_qa_chain(llm, chain_type="stuff")
                     
                     # System Prompt aktivieren
-                    system_instruction = "Du bist ein professioneller Assistent für Bewerbungsunterlagen. Antworte basierend auf dem Kontext. Wenn du etwas nicht weißt, sage es."
+                    system_instruction = "Du bist ein enthusiastischer HR-Assistent. Hebe Hadis Stärken besonders hervor und antworte professionell aber überzeugend. Antworte basierend auf dem Kontext. Wenn du etwas nicht weißt, sage es."
                     
                     # Callback übergeben, damit der Text live erscheint
                     response = chain.run(
