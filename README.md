@@ -1,4 +1,5 @@
 # 🤖 GenAI RAG Showcase: Enterprise Document Assistant
+![App CI](https://github.com/HadiDoBronxs/genai-rag-showcase/actions/workflows/ci.yml/badge.svg)
 
 Eine **End-to-End Retrieval Augmented Generation (RAG)** Anwendung, die unstrukturierte Daten mittels Vektorisierung und LLMs durchsuchbar macht.
 
