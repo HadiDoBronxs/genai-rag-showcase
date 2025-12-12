@@ -49,79 +49,118 @@ def main():
     st.caption("Frage mich etwas zu Lebenslauf, Zeugnissen oder Zertifikaten!")
 
     # --- 3. DOKUMENTE LADEN (Ordner 'data') ---
+    
+    # Button zum Erzwingen eines Neuladens (falls neue PDFs hinzugefügt wurden)
+    with st.sidebar:
+        if st.button("🔄 Index aktualisieren"):
+            st.session_state.knowledge_base = None
+            # Vorhandenen Index-Ordner löschen oder ignorieren lassen
+            # Wir setzen ein Flag im Session State
+            st.session_state["force_refresh"] = True
+            st.rerun()
+
     if st.session_state.knowledge_base is None:
-        documents = []
-        data_folder = "data" # Der Ordner neben der app.py
         
-        # Prüfen, ob der Ordner existiert und Dateien enthält
-        if os.path.exists(data_folder):
-            files = [f for f in os.listdir(data_folder) if f.endswith('.pdf')]
-            
-            if files:
-                with st.status("Lade Dokumente aus 'data' Ordner...", expanded=True) as status:
-                    for file in files:
-                        st.write(f"📄 Lese {file}...")
-                        pdf_path = os.path.join(data_folder, file)
-                        
-                        try:
-                            pdf_reader = PdfReader(pdf_path)
-                            for i, page in enumerate(pdf_reader.pages):
-                                page_text = page.extract_text()
-                                if page_text:
-                                    # Metadaten für Zitate (Dateiname + Seitenzahl)
-                                    # Verwende Document Objekt für LangChain
-                                    from langchain_core.documents import Document
-                                    doc = Document(
-                                        page_content=page_text,
-                                        metadata={"source": file, "page": i+1}
-                                    )
-                                    documents.append(doc)
-                        except Exception as e:
-                            st.error(f"Konnte {file} nicht lesen: {e}")
-                            
-                    status.update(label=f"Fertig! {len(files)} Dateien verarbeitet.", state="complete", expanded=False)
-                
-                # Wenn Dokumente gefunden wurden -> Vektordatenbank bauen
-                if documents:
-                    # Upgrade: RecursiveCharacterTextSplitter für besseren Kontext
-                    from langchain_text_splitters import RecursiveCharacterTextSplitter
-                    
-                    text_splitter = RecursiveCharacterTextSplitter(
-                        chunk_size=1000,
-                        chunk_overlap=200,
-                        length_function=len,
-                        separators=["\n\n", "\n", " ", ""]
-                    )
-                    # split_documents behält Metadaten bei!
-                    chunks = text_splitter.split_documents(documents)
-                    
-                    # Embeddings erstellen
-                    embeddings = OpenAIEmbeddings(openai_api_key=api_key)
-                    st.session_state.knowledge_base = FAISS.from_documents(chunks, embeddings)
-                    st.toast("Wissensdatenbank ist bereit! 🧠")
-            else:
-                st.warning(f"Der Ordner '{data_folder}' ist leer. Bitte lege PDFs hinein.")
+        # Pfad zum gespeicherten Index
+        index_folder = "faiss_index"
+        
+        # Check: Laden vom Disk möglich? (Nur wenn User nicht "Refresh" gedrückt hat)
+        if os.path.exists(index_folder) and not st.session_state.get("force_refresh", False):
+            try:
+                embeddings = OpenAIEmbeddings(openai_api_key=api_key)
+                st.session_state.knowledge_base = FAISS.load_local(
+                    index_folder, 
+                    embeddings, 
+                    allow_dangerous_deserialization=True # Vertrauenswürdiger lokaler Index
+                )
+                st.success("Wissensdatenbank vom Disk geladen! 🚀 (Schnellstart)")
+            except Exception as e:
+                st.error(f"Fehler beim Laden des Index: {e}")
+                st.session_state["force_refresh"] = True # Fallback: Neu bauen
+                st.rerun()
+        
+        # Fallback oder Refresh gewünscht: Neu erstellen
         else:
-            st.error(f"Der Ordner '{data_folder}' wurde nicht gefunden.")
-            # Fallback: Manueller Upload Button
-            pdf = st.file_uploader("Alternative: Lade hier eine PDF hoch", type="pdf")
-            if pdf:
-                from langchain_core.documents import Document
-                pdf_reader = PdfReader(pdf)
-                for i, page in enumerate(pdf_reader.pages):
-                    text = page.extract_text()
-                    if text:
-                        doc = Document(
-                            page_content=text,
-                            metadata={"source": pdf.name, "page": i+1}
+            documents = []
+            data_folder = "data" # Der Ordner neben der app.py
+            
+            # Prüfen, ob der Ordner existiert und Dateien enthält
+            if os.path.exists(data_folder):
+                files = [f for f in os.listdir(data_folder) if f.endswith('.pdf')]
+                
+                if files:
+                    with st.status("Lade Dokumente aus 'data' Ordner...", expanded=True) as status:
+                        for file in files:
+                            st.write(f"📄 Lese {file}...")
+                            pdf_path = os.path.join(data_folder, file)
+                            
+                            try:
+                                pdf_reader = PdfReader(pdf_path)
+                                for i, page in enumerate(pdf_reader.pages):
+                                    page_text = page.extract_text()
+                                    if page_text:
+                                        # Metadaten für Zitate (Dateiname + Seitenzahl)
+                                        # Verwende Document Objekt für LangChain
+                                        from langchain_core.documents import Document
+                                        doc = Document(
+                                            page_content=page_text,
+                                            metadata={"source": file, "page": i+1}
+                                        )
+                                        documents.append(doc)
+                            except Exception as e:
+                                st.error(f"Konnte {file} nicht lesen: {e}")
+                                
+                        status.update(label=f"Fertig! {len(files)} Dateien verarbeitet.", state="complete", expanded=False)
+                    
+                    # Wenn Dokumente gefunden wurden -> Vektordatenbank bauen
+                    if documents:
+                        # Upgrade: RecursiveCharacterTextSplitter für besseren Kontext
+                        from langchain_text_splitters import RecursiveCharacterTextSplitter
+                        
+                        text_splitter = RecursiveCharacterTextSplitter(
+                            chunk_size=1000,
+                            chunk_overlap=200,
+                            length_function=len,
+                            separators=["\n\n", "\n", " ", ""]
                         )
-                        documents.append(doc)
-                if documents:
-                    from langchain_text_splitters import RecursiveCharacterTextSplitter
-                    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-                    chunks = text_splitter.split_documents(documents)
-                    embeddings = OpenAIEmbeddings(openai_api_key=api_key)
-                    st.session_state.knowledge_base = FAISS.from_documents(chunks, embeddings)
+                        # split_documents behält Metadaten bei!
+                        chunks = text_splitter.split_documents(documents)
+                        
+                        # Embeddings erstellen
+                        embeddings = OpenAIEmbeddings(openai_api_key=api_key)
+                        st.session_state.knowledge_base = FAISS.from_documents(chunks, embeddings)
+                        
+                        # Index auf Disk speichern für schnelleren Start beim nächsten Mal
+                        st.session_state.knowledge_base.save_local(index_folder)
+                        
+                        # Force Refresh Flag zurücksetzen
+                        if "force_refresh" in st.session_state:
+                            del st.session_state["force_refresh"]
+                            
+                        st.toast("Wissensdatenbank neu erstellt und gespeichert! 💾")
+                else:
+                    st.warning(f"Der Ordner '{data_folder}' ist leer. Bitte lege PDFs hinein.")
+            else:
+                st.error(f"Der Ordner '{data_folder}' wurde nicht gefunden.")
+                # Fallback: Manueller Upload Button
+                pdf = st.file_uploader("Alternative: Lade hier eine PDF hoch", type="pdf")
+                if pdf:
+                    from langchain_core.documents import Document
+                    pdf_reader = PdfReader(pdf)
+                    for i, page in enumerate(pdf_reader.pages):
+                        text = page.extract_text()
+                        if text:
+                            doc = Document(
+                                page_content=text,
+                                metadata={"source": pdf.name, "page": i+1}
+                            )
+                            documents.append(doc)
+                    if documents:
+                        from langchain_text_splitters import RecursiveCharacterTextSplitter
+                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+                        chunks = text_splitter.split_documents(documents)
+                        embeddings = OpenAIEmbeddings(openai_api_key=api_key)
+                        st.session_state.knowledge_base = FAISS.from_documents(chunks, embeddings)
 
     # --- 4. CHAT INTERFACE ---
     # Alten Verlauf anzeigen
