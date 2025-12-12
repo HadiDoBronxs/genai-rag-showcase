@@ -178,19 +178,31 @@ def main():
         # KI Antwort generieren
         if st.session_state.knowledge_base:
             with st.chat_message("assistant"):
+                # Callback Handler für Streaming (Schreibmaschinen-Effekt)
+                from langchain_community.callbacks import StreamlitCallbackHandler
+                st_callback = StreamlitCallbackHandler(st.container())
+                
                 with st.spinner("Suche Antworten..."):
                     # 1. Relevante Textstellen finden
                     docs = st.session_state.knowledge_base.similarity_search(prompt)
                     
-                    # 2. GPT-3.5 fragen
-                    llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key)
+                    # 2. GPT-3.5 fragen (mit Streaming aktiviert)
+                    llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key, streaming=True)
                     chain = load_qa_chain(llm, chain_type="stuff")
                     
                     # System Prompt aktivieren
                     system_instruction = "Du bist ein professioneller Assistent für Bewerbungsunterlagen. Antworte basierend auf dem Kontext. Wenn du etwas nicht weißt, sage es."
-                    response = chain.run(input_documents=docs, question=f"{system_instruction}\nFrage: {prompt}")
                     
-                    st.markdown(response)
+                    # Callback übergeben, damit der Text live erscheint
+                    response = chain.run(
+                        input_documents=docs, 
+                        question=f"{system_instruction}\nFrage: {prompt}",
+                        callbacks=[st_callback]
+                    )
+                    
+                    # Falls der Callback das Markdown nicht final rendert (manchmal nötig):
+                    # st.markdown(response) -> Der Callback macht das meist schon, aber sicherheitshalber lassen wir es weg, um Doppelung zu vermeiden.
+                    # Wenn der Callback fertig ist, steht der Text da.
                     
                     # 3. Quellen anzeigen
                     with st.expander("📚 Verwendete Quellen anzeigen"):
