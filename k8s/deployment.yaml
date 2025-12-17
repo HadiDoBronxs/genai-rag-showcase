@@ -1,0 +1,28 @@
+apiVersion: apps/v1  # Die Version der Kubernetes-API, die wir nutzen
+kind: Deployment     # Art der Ressource: Ein Deployment kümmert sich um Updates und Replicas
+metadata:
+  name: genai-rag-app # Der Name unseres Deployments im Cluster
+  labels:
+    app: genai-rag    # Labels helfen uns, Ressourcen zu gruppieren und zu finden
+spec:
+  replicas: 1         # Wir wollen vorerst nur 1 Instanz der App laufen haben
+  selector:
+    matchLabels:
+      app: genai-rag  # Dieses Deployment kümmert sich um alle Pods mit diesem Label
+  template:           # Vorlage für die Pods (die eigentlichen Container)
+    metadata:
+      labels:
+        app: genai-rag
+    spec:
+      containers:
+      - name: genai-rag-container
+        image: genai-rag:latest  # Das Docker-Image, das wir gebaut haben
+        imagePullPolicy: IfNotPresent # Nur neu laden, wenn es nicht da ist (gut für lokal)
+        ports:
+        - containerPort: 8501    # Der Port, den unsere App intern öffnet
+        env:                     # Umgebungsvariablen für den Container
+        - name: OPENAI_API_KEY
+          valueFrom:             # Wir laden den Key sicher aus einem "Secret" (muss separat erstellt werden)
+             secretKeyRef:
+               name: openai-secret
+               key: api-key
