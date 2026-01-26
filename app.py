@@ -72,10 +72,10 @@ def main():
             # Relevante Textstellen finden
             docs = knowledge_base.similarity_search(prompt)
             
-            llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key, streaming=True)
+            llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=api_key, streaming=True, temperature=0)
             chain = load_qa_chain(llm, chain_type="stuff")
             
-            system_instruction = "Du bist ein enthusiastischer HR-Assistent. Hebe Hadis Stärken besonders hervor und antworte professionell aber überzeugend. Antworte basierend auf dem Kontext. Wenn du etwas nicht weißt, sage es."
+            system_instruction = "Du bist ein professioneller HR-Assistent. Antworte NUR basierend auf dem folgenden Kontext. Wenn die Antwort nicht im Kontext enthalten ist, sage explizit 'Ich weiß es nicht' und erfinde keine Fakten. Hebe Hadis Stärken hervor, wo es der Kontext belegt."
             
             response = chain.run(
                 input_documents=docs, 
